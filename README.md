@@ -3,7 +3,14 @@
 
 因为我只是为了Stream成就，所以我没仔细研究铺面文件结构，有些铺子没法正常使用是正常的。
 
-[使用例子](https://www.bilibili.com)
+首次使用前自行配置Setings.json。
+默认键位为:
+- 上 DF
+- 下 JK
+
+默认路径为`"E:\\SteamLibrary\\steamapps\\common\\Muse Dash"`
+
+[使用例子](https://www.bilibili.com/video/BV1EH4y167cL)
 ## 编译本程序
 首次编译后缺少的AssetBundleOperationNative.dll请自行去我的Release中复制。
 ## 注意
