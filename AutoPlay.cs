@@ -61,14 +61,14 @@ namespace Muse_Dash
                 {
                     if (!data.isLongPressing && !data.isLongPressEnd & data.configData.length != 0)
                     {
-                        if(data.configData.note_uid.Substring(2, 2) == "02" || data.endIndex != 0)
+                        if(data.configData.note_uid.Substring(2, 2) == "02" || data.endIndex != 0)//长按
                         {
                             values.Add((data.tick, data.configData.pathway == 1 ? up[(up.Length + 1 - a++) % up.Length] : down[(down.Length + 1 - b++) % down.Length], KeyType.On));
                             //last = data.tick;
                         }
                         else
                         {
-                            values.Add((data.tick, data.configData.pathway == 1 ? up[1] : down[1], KeyType.On | KeyType.Keep));
+                            values.Add((data.tick, data.configData.pathway == 1 ? up[1] : down[1], KeyType.On | KeyType.Keep));//连打
                             if (data.configData.length > 640)
                             {
                                 values.Add((data.configData.length + data.tick, data.configData.pathway == 1 ? up[1] : down[1], KeyType.Off | KeyType.Keep));
@@ -80,37 +80,37 @@ namespace Muse_Dash
                             //last = data.tick + data.configData.length * atri;
                         }
                     }
-                    else if (data.isLongPressing)
+                    else if (data.isLongPressing)//历史遗留问题
                     {
                         if (!keyValuePairs.TryAdd(data.endIndex, data.tick - last))
                         {
                             keyValuePairs[data.endIndex] = data.tick - last;
                         }
                     }
-                    else if (data.isLongPressEnd)
+                    else if (data.isLongPressEnd)//长按的结尾，似乎我这写错了，应该是模仿连打的写法而不是使用data.tick
                     {
                         values.Add((data.tick, data.configData.pathway == 1 ? up[(up.Length + 1 - --a) % up.Length] : down[(down.Length + 1 - --b) % down.Length], KeyType.Off));
                         //last = data.tick;
                     }
-                    else if (data.isDouble)
+                    else if (data.isDouble)//双压，其实可以不列出来
                     {
                         values.Add((data.tick, data.configData.pathway == 1 ? up[0] : down[0], KeyType.Tap));
                         //last = data.tick;
                     }
                     else
                     {
-                        if (!data.configData.note_uid.StartsWith("00") && (data.configData.note_uid.Substring(2,2) == "03" || data.configData.note_uid.Substring(2, 2) == "09"))
+                        if (!data.configData.note_uid.StartsWith("00") && (data.configData.note_uid.Substring(2,2) == "03" || data.configData.note_uid.Substring(2, 2) == "09"))//齿轮
                         {
                             values.Add((data.tick, data.configData.pathway == 1 ? down[0] : up[0], KeyType.Soft | KeyType.Tap));
                             //last = data.tick;
                         }
                         else
                         {
-                            if (data.configData.note_uid.StartsWith("00"))
+                            if (data.configData.note_uid.StartsWith("00"))//蓝色音符
                             {
                                 values.Add((data.tick, data.configData.pathway == 1 ? up[0] : down[0], KeyType.Tap | KeyType.Soft));
                             }
-                            else
+                            else//其他的任何note
                             {
                                 values.Add((data.tick, data.configData.pathway == 1 ? up[0] : down[0], KeyType.Tap));
                             }
@@ -128,7 +128,7 @@ namespace Muse_Dash
             {
                 return a.Item1.CompareTo(b.Item1);
             });
-            for (int j = 0; j < values.Count; j++)
+            for (int j = 0; j < values.Count; j++)//这个for用于移除齿轮导致的多余的点击
             {
                 if ((values[j].Item3 & KeyType.Soft) != 0)
                 {
@@ -166,7 +166,7 @@ namespace Muse_Dash
                     {
                         var atri00 = values[j];
                         values.RemoveAt(j);
-                        values.Insert(j, (atri00.Item1 + atri / 50, atri00.Item2, (KeyType)(atri00.Item3 - KeyType.Soft)));
+                        values.Insert(j, (atri00.Item1 + atri / 50, atri00.Item2, (KeyType)(atri00.Item3 - KeyType.Soft)));//防止齿轮接蓝色音符，然后点太快撞到齿轮
                     }
                 }
             }
@@ -218,7 +218,7 @@ namespace Muse_Dash
                 {
                     flag--;
                 }
-                Console.WriteLine(flag);
+                Console.WriteLine(flag);//其实这个flag可以换bool
                 return;
             }
             if ((keyType.Item3 & KeyType.Tap) != 0)

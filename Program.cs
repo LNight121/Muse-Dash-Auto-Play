@@ -1,6 +1,14 @@
 ﻿// See https://aka.ms/new-console-template for more information
 using Muse_Dash;
-var songs = AutoPlay.Create("E:\\SteamLibrary\\steamapps\\common\\Muse Dash\\MuseDash_Data\\StreamingAssets\\aa\\StandaloneWindows64\\");
+using Newtonsoft.Json;
+using System.Text;
+
+Console.WriteLine("Mues Dash Auto Play \nV1.0.0 Original");
+Console.WriteLine("Wait for three seconds...");
+Thread.Sleep(3000);
+string json = File.ReadAllText("Setings.json");
+var set = JsonConvert.DeserializeObject<Setings>(json);
+var songs = AutoPlay.Create($"{set.Path}\\MuseDash_Data\\StreamingAssets\\aa\\StandaloneWindows64\\");
 do
 {
     var temp = new Dictionary<int, string>();
@@ -23,6 +31,6 @@ do
     Console.WriteLine("选择难度");
     index = int.Parse(Console.ReadLine());
     var data = AutoPlay.Init(temp[index]);
-    AutoPlay.Paly(data, new Byte[] { 68, 70 }, new Byte[] { 74, 75 });
+    AutoPlay.Paly(data, Encoding.ASCII.GetBytes(set.Up), Encoding.ASCII.GetBytes(set.Down));
     Console.WriteLine("输入n继续");
 } while (Console.ReadLine() == "n");
