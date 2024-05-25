@@ -1,5 +1,6 @@
 ﻿using AssetBundleOperation.CSharpUseNative;
 using System;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Xml.Linq;
@@ -14,6 +15,7 @@ namespace Muse_Dash
         Tap=0x4,
         Keep=0x8,
         Soft=0x10,
+        Week=0x20,
     }
     public static class AutoPlay
     {
@@ -63,7 +65,7 @@ namespace Muse_Dash
                     {
                         if(data.configData.note_uid.Substring(2, 2) == "02" || data.endIndex != 0)//长按
                         {
-                            values.Add((data.tick, data.configData.pathway == 1 ? up[(up.Length + 1 - a++) % up.Length] : down[(down.Length + 1 - b++) % down.Length], KeyType.On));
+                            values.Add((data.tick, data.configData.pathway == 1 ? up[(up.Length - 1 - a++) % up.Length] : down[(down.Length - 1 - b++) % down.Length], KeyType.On));
                             //last = data.tick;
                         }
                         else
@@ -71,11 +73,25 @@ namespace Muse_Dash
                             values.Add((data.tick, data.configData.pathway == 1 ? up[1] : down[1], KeyType.On | KeyType.Keep));//连打
                             if (data.configData.length > 640)
                             {
-                                values.Add((data.configData.length + data.tick, data.configData.pathway == 1 ? up[1] : down[1], KeyType.Off | KeyType.Keep));
+                                values.Add((data.configData.length, data.configData.pathway == 1 ? up[1] : down[1], KeyType.Off | KeyType.Keep));
                             }
                             else
                             {
-                                values.Add((data.configData.length * atri + data.tick, data.configData.pathway == 1 ? up[1] : down[1], KeyType.Off | KeyType.Keep));
+                                values.Add((data.configData.length * atri, data.configData.pathway == 1 ? up[1] : down[1], KeyType.Off | KeyType.Keep));
+                            }
+                            if (values[values.Count - 1].Item1 < values[values.Count - 2].Item1)
+                            {
+                                var tempitem = values[values.Count - 1];
+                                values.RemoveAt(values.Count - 1);
+                                tempitem.Item1 += values[values.Count - 1].Item1;
+                                values.Add(tempitem);
+                            }
+                            if (values[values.Count - 1].Item1 - values[values.Count - 2].Item1 > atri / 2)//连打似乎变怪了，临时办法
+                            {
+                                var tempitem = values[values.Count - 1];
+                                values.RemoveAt(values.Count - 1);
+                                tempitem.Item1 = values[values.Count - 1].Item1 + atri / 2;
+                                values.Add(tempitem);
                             }
                             //last = data.tick + data.configData.length * atri;
                         }
@@ -89,7 +105,7 @@ namespace Muse_Dash
                     }
                     else if (data.isLongPressEnd)//长按的结尾，似乎我这写错了，应该是模仿连打的写法而不是使用data.tick
                     {
-                        values.Add((data.tick, data.configData.pathway == 1 ? up[(up.Length + 1 - --a) % up.Length] : down[(down.Length + 1 - --b) % down.Length], KeyType.Off));
+                        values.Add((data.tick, data.configData.pathway == 1 ? up[(up.Length - 1 - --a) % up.Length] : down[(down.Length - 1 - --b) % down.Length], KeyType.Off));
                         //last = data.tick;
                     }
                     else if (data.isDouble)//双压，其实可以不列出来
@@ -101,14 +117,18 @@ namespace Muse_Dash
                     {
                         if (!data.configData.note_uid.StartsWith("00") && (data.configData.note_uid.Substring(2,2) == "03" || data.configData.note_uid.Substring(2, 2) == "09"))//齿轮
                         {
-                            values.Add((data.tick, data.configData.pathway == 1 ? down[0] : up[0], KeyType.Soft | KeyType.Tap));
+                            values.Add((data.tick - atri / 40, data.configData.pathway == 1 ? down[0] : up[0], KeyType.Soft | KeyType.Tap));
+                            if (data.configData.pathway == 0)
+                            {
+                                //values.Add((data.tick + atri * 25 / 100, down[0], KeyType.Tap | KeyType.Week | KeyType.Soft));
+                            }
                             //last = data.tick;
                         }
                         else
                         {
                             if (data.configData.note_uid.StartsWith("00"))//蓝色音符
                             {
-                                values.Add((data.tick, data.configData.pathway == 1 ? up[0] : down[0], KeyType.Tap | KeyType.Soft));
+                                values.Add((data.tick + atri / 40, data.configData.pathway == 1 ? up[0] : down[0], KeyType.Tap | KeyType.Soft));
                             }
                             else//其他的任何note
                             {
@@ -117,7 +137,7 @@ namespace Muse_Dash
                             //last = data.tick;
                             if (data.configData.time < 1000)
                             {
-                                atri = data.tick / data.configData.time;
+                                //atri = data.tick / data.configData.time;
                             }
                         }
                     }
@@ -128,17 +148,52 @@ namespace Muse_Dash
             {
                 return a.Item1.CompareTo(b.Item1);
             });
-            for (int j = 0; j < values.Count; j++)//这个for用于移除齿轮导致的多余的点击
+            for (int i = 0; i < values.Count; i++)
+            {
+                if (i + 1 < values.Count && (values[i].Item3 & KeyType.Week) != 0)
+                {
+                    bool flag = false;
+                    decimal sum = atri * 13 / 100 + values[i].Item1;
+                    for (int j = i + 1; j < values.Count; j++)
+                    {
+                        if (sum > values[j].Item1)
+                        {
+                            if (values[j].Item2 == values[i].Item2)
+                            {
+                                flag = true;
+                                break;
+                            }
+                        }
+                        else
+                        {
+                            break;
+                        }
+                    }
+                    if (flag)
+                    {
+                        var atri00 = values[i];
+                        values.RemoveAt(i);
+                        values.Insert(i, (atri00.Item1, atri00.Item2, KeyType.None));
+                    }
+                    else
+                    {
+                        var atri00 = values[i];
+                        values.RemoveAt(i);
+                        values.Insert(i, (atri00.Item1, atri00.Item2, (KeyType)(atri00.Item3 - KeyType.Week)));
+                    }
+                }
+            }
+            for (int j = 0; j < values.Count; j++)//这个for用于合并齿轮和蓝色音符导致的多余的点击
             {
                 if ((values[j].Item3 & KeyType.Soft) != 0)
                 {
-                    decimal sum = atri / 10 + values[j].Item1;
+                    decimal sum = atri * 13 / 100 + values[j].Item1;
                     bool flag = false;
                     for (int k = j + 1; k < values.Count; k++)
                     {
                         if (sum > values[k].Item1)
                         {
-                            if ((values[k].Item3 & KeyType.Soft) == 0)
+                            if ((values[k].Item3 & KeyType.Soft) == 0 && values[k].Item3 != KeyType.None)
                             {
                                 if (up.Contains(values[k].Item2) ^ up.Contains(values[j].Item2))
                                 {
@@ -166,7 +221,7 @@ namespace Muse_Dash
                     {
                         var atri00 = values[j];
                         values.RemoveAt(j);
-                        values.Insert(j, (atri00.Item1 + atri / 50, atri00.Item2, (KeyType)(atri00.Item3 - KeyType.Soft)));//防止齿轮接蓝色音符，然后点太快撞到齿轮
+                        values.Insert(j, (atri00.Item1, atri00.Item2, (KeyType)(atri00.Item3 - KeyType.Soft)));
                     }
                 }
             }
@@ -186,7 +241,7 @@ namespace Muse_Dash
                 int count = 0;
                 while (p < key.Length)
                 {
-                    while (p < key.Length && (key[p].Item1 - offset) * last - now + start < ((long)(0.01 * frequency)))
+                    while (p < key.Length && (key[p].Item1 - offset) * last - now + start < ((long)(0.005 * frequency)))
                     {
                         Do(key[p++], ref flag);
                         QueryPerformanceCounter(out now);
@@ -239,65 +294,94 @@ namespace Muse_Dash
         public static StageInfo Init(string path)
         {
             long fileid = 0;
+            IntPtr map;
             IntPtr bundle = Native.LoadAssetBundleByPath(path,false,ref fileid);
             fileid = long.MinValue;
             fileid = Native.ObjectInfoYield(bundle, fileid);
+            string ss = "";
+            var dict = new Dictionary<string, long>();
             while (fileid != long.MinValue)
             {
-                IntPtr map=Native.GetUnSerializeValue(bundle, fileid, "bpm");
-                if(map != IntPtr.Zero)
+                map = Native.GetUnSerializeValue(bundle, fileid, "mapName.Array");
+                if (map != IntPtr.Zero)
                 {
-                    var result=new StageInfo();
-                    result.bpm = BitConverter.Int32BitsToSingle(Marshal.ReadInt32(map));
-                    map = Native.GetUnSerializeValue(bundle, fileid, "serializationData.SerializedBytes.Array");
-                    Byte[] res= new Byte[Marshal.ReadInt32(map)];
-                    Marshal.Copy(map + 4, res, 0, res.Length);
-                    Native.UnLoadAssetBundle(bundle);
-                    result.UnSerialze(new MemoryStream(res));
-                    return result;
+                    ss = Marshal.PtrToStringAnsi(map + 4, Marshal.ReadInt32(map));
+                    dict[ss] = fileid;
                 }
                 fileid = Native.ObjectInfoYield(bundle, fileid);
             }
+            int index = 0;
+            var temp = new Dictionary<int, string>();
+            foreach(var f in dict)
+            {
+                Console.WriteLine($"{index}:{f.Key}");
+                temp[index] = f.Key;
+                index++;
+            }
+            Console.WriteLine("请选择难度");
+            index=int.Parse(Console.ReadLine());
+            fileid = dict[temp[index]];
+            map = Native.GetUnSerializeValue(bundle, fileid, "bpm");
+            if (map != IntPtr.Zero)
+            {
+                var result = new StageInfo();
+                result.bpm = BitConverter.Int32BitsToSingle(Marshal.ReadInt32(map));
+                map = Native.GetUnSerializeValue(bundle, fileid, "serializationData.SerializedBytes.Array");
+                Byte[] res = new Byte[Marshal.ReadInt32(map)];
+                Marshal.Copy(map + 4, res, 0, res.Length);
+                Native.UnLoadAssetBundle(bundle);
+                //File.WriteAllBytes("dump.dmp", res);
+                result.UnSerialze(new MemoryStream(res));
+                return result;
+            }
             return null;
         }
+        static string songnamestart = "music_";
         public static Dictionary<string,List<FileInfo>> Create(string path)
         {
             var dict = new Dictionary<string, List<FileInfo>>();
             var d = new DirectoryInfo(path);
-            var dd = d.GetFiles("*.bundle").Where(e => e.Name.StartsWith("noteasset_assets_")).ToArray();
-            Dictionary<string,string> temp = new Dictionary<string, string>();
+            var dd = d.GetFiles("*.bundle").Where(e => e.Name.StartsWith(songnamestart)).ToArray();
+            int cnt = 0;
             foreach(var f in dd)
             {
-                var s = f.Name.Substring("noteasset_assets_".Length);
-                s = s.Substring(0, s.LastIndexOf("map") - 1);
-                if (temp.ContainsKey(s))
+                var s = f.Name.Substring(songnamestart.Length);
+                try
                 {
-                    dict[temp[s]].Add(f);
+                    s = s.Substring(0, s.LastIndexOf("_assets_all"));
                 }
-                else
+                catch { }
+                string ss = s;
+                if (!dict.ContainsKey(ss))
                 {
-                    string ss = "";
-                    long fileid = 0;
-                    IntPtr bundle = Native.LoadAssetBundleByPath(f.FullName, false, ref fileid);
-                    fileid = long.MinValue;
-                    fileid = Native.ObjectInfoYield(bundle, fileid);
-                    while (fileid != long.MinValue)
+                    dict.Add(ss, new List<FileInfo>());
+
+                }
+                dict[ss].Add(f);
+                continue;
+                long fileid = 0;
+                IntPtr bundle = Native.LoadAssetBundleByPath(f.FullName, false, ref fileid);
+                fileid = long.MinValue;
+                fileid = Native.ObjectInfoYield(bundle, fileid);
+                while (fileid != long.MinValue)
+                {
+                    IntPtr map = Native.GetUnSerializeValue(bundle, fileid, "music.Array");
+                    if (map != IntPtr.Zero)
                     {
-                        IntPtr map = Native.GetUnSerializeValue(bundle, fileid, "music.Array");
-                        if (map != IntPtr.Zero)
+                        ss = Marshal.PtrToStringAnsi(map + 4, Marshal.ReadInt32(map));
+                        if (!dict.ContainsKey(ss))
                         {
-                            ss = Marshal.PtrToStringAnsi(map + 4, Marshal.ReadInt32(map));
-                            Native.UnLoadAssetBundle(bundle);
-                            break;
+                            dict.Add(ss, new List<FileInfo>());
+                            
                         }
-                        fileid = Native.ObjectInfoYield(bundle, fileid);
-                    }
-                    temp.Add(s, ss);
-                    if(!dict.TryAdd(ss, new List<FileInfo>() { f }))
-                    {
                         dict[ss].Add(f);
+                        Native.UnLoadAssetBundle(bundle);
+                        break;
                     }
+                    fileid = Native.ObjectInfoYield(bundle, fileid);
                 }
+                cnt++;
+                if (cnt % 10 == 0) Console.WriteLine($"{cnt}/{dd.Length}");
             }
             return dict;
         }

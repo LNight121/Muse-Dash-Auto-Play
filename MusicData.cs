@@ -66,6 +66,8 @@ namespace Muse_Dash
             s.ReadBytes(s.ReadInt32() * 2);
             doubleIdx=s.ReadInt32();
             s.ReadBytes(2);
+            s.ReadBytes(s.ReadInt32() * 2);//sameTickNoteIdx
+            s.ReadBytes(2);
             s.ReadBytes(s.ReadInt32() * 2);
             isDouble = s.ReadBoolean();
             s.ReadBytes(2);

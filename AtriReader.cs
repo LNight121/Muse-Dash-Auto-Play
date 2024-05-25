@@ -20,5 +20,17 @@ namespace Muse_Dash
             }
             return new Decimal(temp);
         }
+        public override int ReadInt32()
+        {
+            var temp = ReadBytes(4);
+            if (temp[3] != 0)
+            {
+                return BitConverter.ToInt32(temp.Reverse().ToArray(), 0);
+            }
+            else
+            {
+                return BitConverter.ToInt32(temp, 0);
+            }
+        }
     }
 }

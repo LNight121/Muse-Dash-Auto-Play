@@ -5,7 +5,9 @@ using System.Text;
 
 Console.WriteLine("Mues Dash Auto Play \nV1.0.0 Original");
 Console.WriteLine("Wait for three seconds...");
+#if !DEBUG
 Thread.Sleep(3000);
+#endif
 string json = File.ReadAllText("Setings.json");
 var set = JsonConvert.DeserializeObject<Setings>(json);
 var songs = AutoPlay.Create($"{set.Path}\\MuseDash_Data\\StreamingAssets\\aa\\StandaloneWindows64\\");
@@ -23,14 +25,22 @@ do
     string sele = temp[index];
     temp.Clear();
     index = 0;
-    foreach (var file in songs[sele])
+    if (songs[sele].Count > 1)
     {
-        Console.WriteLine($"{index}:{file.Name}");
-        temp.Add(index++, file.FullName);
+        Console.WriteLine("出现同名歌曲，请选择");
+        foreach (var file in songs[sele])
+        {
+            Console.WriteLine($"{index}:{file.Name}");
+            temp.Add(index++, file.FullName);
+        }
+        index = int.Parse(Console.ReadLine());
+        sele = temp[index];
     }
-    Console.WriteLine("选择难度");
-    index = int.Parse(Console.ReadLine());
-    var data = AutoPlay.Init(temp[index]);
+    else
+    {
+        sele = songs[sele][0].FullName;
+    }
+    var data = AutoPlay.Init(sele);
     AutoPlay.Paly(data, Encoding.ASCII.GetBytes(set.Up), Encoding.ASCII.GetBytes(set.Down));
     Console.WriteLine("输入n继续");
 } while (Console.ReadLine() == "n");
