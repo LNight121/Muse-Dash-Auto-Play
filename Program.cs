@@ -3,7 +3,7 @@ using Muse_Dash;
 using Newtonsoft.Json;
 using System.Text;
 
-Console.WriteLine("Mues Dash Auto Play \nV1.0.0 Original");
+Console.WriteLine("Mues Dash Auto Play \nV1.0.1 Original");
 Console.WriteLine("Wait for three seconds...");
 #if !DEBUG
 Thread.Sleep(3000);
