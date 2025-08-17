@@ -24,6 +24,13 @@ namespace Muse_Dash
 
         [DllImport("kernel32.dll")]
         private static extern bool QueryPerformanceFrequency(out long lpFrequency);
+
+        [DllImport("user32.dll")]
+        public static extern short GetKeyState(int nVirtKey);
+        public static bool IsKeyPressed(int VK)
+        {
+            return (GetKeyState(VK) & 0x8000) != 0;
+        }
         public static void Paly(StageInfo datas,byte[] up,byte[] down)
         {
             long frequency;
@@ -239,6 +246,7 @@ namespace Muse_Dash
                 int flag = 0;
                 Do(key[p++], ref flag);
                 int count = 0;
+                bool bflag = false;
                 while (p < key.Length)
                 {
                     while (p < key.Length && (key[p].Item1 - offset) * last - now + start < ((long)(0.005 * frequency)))
@@ -247,6 +255,26 @@ namespace Muse_Dash
                         QueryPerformanceCounter(out now);
                     }
                     Thread.Sleep(1);
+                    if (bflag)
+                    {
+                        if (IsKeyPressed(0x25))
+                        {
+                            start -= frequency / 100;
+                            bflag = false;
+                            Console.WriteLine("--");
+                        }
+                        else if (IsKeyPressed(0x27))
+                        {
+                            start += frequency / 100;
+                            bflag = false;
+                            Console.WriteLine("++");
+                        }
+                    }
+                    else
+                    {
+                        bflag = IsKeyPressed(0x28);
+                    }
+
                     count++;
                     if (flag > 0)
                     {
@@ -273,7 +301,7 @@ namespace Muse_Dash
                 {
                     flag--;
                 }
-                Console.WriteLine(flag);//其实这个flag可以换bool
+                //Console.WriteLine(flag);//其实这个flag可以换bool
                 return;
             }
             if ((keyType.Item3 & KeyType.Tap) != 0)
