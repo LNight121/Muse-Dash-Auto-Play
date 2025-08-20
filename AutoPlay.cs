@@ -1,8 +1,10 @@
 ﻿using AssetBundleOperation.CSharpUseNative;
+using Newtonsoft.Json;
 using System;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
+using System.Text.RegularExpressions;
 using System.Xml.Linq;
 
 namespace Muse_Dash
@@ -333,7 +335,7 @@ namespace Muse_Dash
                 map = Native.GetUnSerializeValue(bundle, fileid, "mapName.Array");
                 if (map != IntPtr.Zero)
                 {
-                    ss = Marshal.PtrToStringAnsi(map + 4, Marshal.ReadInt32(map));
+                    ss = Marshal.PtrToStringUTF8(map + 4, Marshal.ReadInt32(map));
                     dict[ss] = fileid;
                 }
                 fileid = Native.ObjectInfoYield(bundle, fileid);
@@ -365,10 +367,70 @@ namespace Muse_Dash
             return null;
         }
         static string songnamestart = "music_";
+        static string songnames = "config_others_assets_album";
+        private static string RemoveLineComments(string input)
+        {
+            // 模式说明：
+            // (@(?:""[^""]*"")+|""(?:[^""\n\\]+|\\.)*"") - 匹配字符串字面量
+            // |//.* - 或者匹配单行注释
+            string pattern = @"(@(?:""[^""]*"")+|""(?:[^""\n\\]+|\\.)*"")|//.*";
+
+            return Regex.Replace(input, pattern, match => {
+                // 如果是字符串字面量，保留原样
+                if (match.Groups[1].Success)
+                {
+                    return match.Value;
+                }
+                // 如果是注释，替换为空
+                return "";
+            });
+        }
         public static Dictionary<string,List<FileInfo>> Create(string path)
         {
             var dict = new Dictionary<string, List<FileInfo>>();
+            var name2name = new Dictionary<string, string>();
             var d = new DirectoryInfo(path);
+            var names = d.GetFiles("*.bundle").Where(e => e.Name.StartsWith(songnames)).ToArray();
+            foreach(var f in names)
+            {
+                long fileid = 0;
+                IntPtr map;
+                IntPtr bundle = Native.LoadAssetBundleByPath(f.FullName, false, ref fileid);
+                fileid = long.MinValue;
+                fileid = Native.ObjectInfoYield(bundle, fileid);
+                string sp=null;
+                while (fileid != long.MinValue)
+                {
+                    map = Native.GetUnSerializeValue(bundle, fileid, "m_Script.Array");
+                    if (map != IntPtr.Zero)
+                    {
+                        sp = Marshal.PtrToStringUTF8(map + 4, Marshal.ReadInt32(map));
+                    }
+                    fileid = Native.ObjectInfoYield(bundle, fileid);
+                }
+                if (!string.IsNullOrEmpty(sp))
+                {
+                    sp = RemoveLineComments(sp);
+                    var dates = (Newtonsoft.Json.Linq.JArray)JsonConvert.DeserializeObject(sp);
+                    if(dates != null)
+                    {
+                        foreach (var date in dates)
+                        {
+                            string iname = (string)date["music"];
+                            string oname = (string)date["name"];
+                            if (string.IsNullOrEmpty(iname)||string.IsNullOrEmpty(oname))
+                            {
+                                continue;
+                            }
+                            if (iname.EndsWith("_music"))
+                            {
+                                iname = iname.Substring(0, iname.Length - 6);
+                            }
+                            name2name[iname] = $"{oname}（{iname}）";
+                        }
+                    }
+                }
+            }
             var dd = d.GetFiles("*.bundle").Where(e => e.Name.StartsWith(songnamestart)).ToArray();
             int cnt = 0;
             foreach(var f in dd)
@@ -379,37 +441,39 @@ namespace Muse_Dash
                     s = s.Substring(0, s.LastIndexOf("_assets_all"));
                 }
                 catch { }
-                string ss = s;
-                if (!dict.ContainsKey(ss))
+                if (name2name.ContainsKey(s))
                 {
-                    dict.Add(ss, new List<FileInfo>());
-
+                    s = name2name[s];
                 }
-                dict[ss].Add(f);
-                continue;
-                long fileid = 0;
-                IntPtr bundle = Native.LoadAssetBundleByPath(f.FullName, false, ref fileid);
-                fileid = long.MinValue;
-                fileid = Native.ObjectInfoYield(bundle, fileid);
-                while (fileid != long.MinValue)
+                if (!dict.ContainsKey(s))
                 {
-                    IntPtr map = Native.GetUnSerializeValue(bundle, fileid, "music.Array");
-                    if (map != IntPtr.Zero)
-                    {
-                        ss = Marshal.PtrToStringAnsi(map + 4, Marshal.ReadInt32(map));
-                        if (!dict.ContainsKey(ss))
-                        {
-                            dict.Add(ss, new List<FileInfo>());
+                    dict[s]=new List<FileInfo>();
+                }
+                dict[s].Add(f);
+                //continue;
+                //long fileid = 0;
+                //IntPtr bundle = Native.LoadAssetBundleByPath(f.FullName, false, ref fileid);
+                //fileid = long.MinValue;
+                //fileid = Native.ObjectInfoYield(bundle, fileid);
+                //while (fileid != long.MinValue)
+                //{
+                //    IntPtr map = Native.GetUnSerializeValue(bundle, fileid, "music.Array");
+                //    if (map != IntPtr.Zero)
+                //    {
+                //        ss = Marshal.PtrToStringAnsi(map + 4, Marshal.ReadInt32(map));
+                //        if (!dict.ContainsKey(ss))
+                //        {
+                //            dict.Add(ss, new List<FileInfo>());
                             
-                        }
-                        dict[ss].Add(f);
-                        Native.UnLoadAssetBundle(bundle);
-                        break;
-                    }
-                    fileid = Native.ObjectInfoYield(bundle, fileid);
-                }
-                cnt++;
-                if (cnt % 10 == 0) Console.WriteLine($"{cnt}/{dd.Length}");
+                //        }
+                //        dict[ss].Add(f);
+                //        Native.UnLoadAssetBundle(bundle);
+                //        break;
+                //    }
+                //    fileid = Native.ObjectInfoYield(bundle, fileid);
+                //}
+                //cnt++;
+                //if (cnt % 10 == 0) Console.WriteLine($"{cnt}/{dd.Length}");
             }
             return dict;
         }

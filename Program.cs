@@ -20,7 +20,7 @@ do
         Console.WriteLine($"{index}:{song}");
         temp.Add(index++, song);
     }
-    Console.WriteLine("选择歌曲");
+    Console.WriteLine("输入数字来选择歌曲");
     index = int.Parse(Console.ReadLine());
     string sele = temp[index];
     temp.Clear();
@@ -40,6 +40,7 @@ do
     {
         sele = songs[sele][0].FullName;
     }
+    //sele = songs[sele].FullName;
     var data = AutoPlay.Init(sele);
     AutoPlay.Paly(data, Encoding.ASCII.GetBytes(set.Up), Encoding.ASCII.GetBytes(set.Down));
     Console.WriteLine("输入n继续");
